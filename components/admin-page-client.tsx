@@ -1,28 +1,60 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useSyncExternalStore } from "react";
 
-import { AdminPageClient } from "@/components/admin-page-client";
+import {
+  getLocalSessionsDigest,
+  subscribeToSessionStore,
+} from "@/lib/scheduler-bot/browser-storage";
 import { formatDateTime } from "@/lib/scheduler-bot/format";
-import { getStorageMode } from "@/lib/scheduler-bot/storage-mode";
-import { listSessionSummaries } from "@/lib/scheduler-bot/storage";
+import type { InterviewSession } from "@/lib/scheduler-bot/types";
 
-export const dynamic = "force-dynamic";
+export function AdminPageClient() {
+  const digest = useSyncExternalStore(
+    subscribeToSessionStore,
+    getLocalSessionsDigest,
+    () => "",
+  );
+  const sessions = useMemo<InterviewSession[]>(() => {
+    if (!digest) {
+      return [];
+    }
 
-export default async function AdminPage() {
-  const storageMode = getStorageMode();
+    try {
+      const entries = JSON.parse(digest) as Array<[string, string]>;
+      return entries
+        .map(([, raw]) => {
+          if (!raw) {
+            return null;
+          }
 
-  if (storageMode === "browser") {
-    return <AdminPageClient />;
-  }
-
-  const sessions = await listSessionSummaries();
-  const completedCount = sessions.filter((session) => session.status === "review-ready").length;
-  const averageCoverage =
-    sessions.length === 0
-      ? 0
-      : Math.round(
-          sessions.reduce((total, session) => total + session.completionRate, 0) /
-            sessions.length,
+          return JSON.parse(raw) as InterviewSession;
+        })
+        .filter((session): session is InterviewSession => Boolean(session))
+        .sort(
+          (left, right) =>
+            new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
         );
+    } catch {
+      return [];
+    }
+  }, [digest]);
+
+  const completedCount = useMemo(
+    () => sessions.filter((session) => session.insights.status === "review-ready").length,
+    [sessions],
+  );
+  const averageCoverage = useMemo(
+    () =>
+      sessions.length === 0
+        ? 0
+        : Math.round(
+            sessions.reduce((total, session) => total + session.insights.completionRate, 0) /
+              sessions.length,
+          ),
+    [sessions],
+  );
 
   return (
     <main className="shell">
@@ -36,6 +68,7 @@ export default async function AdminPage() {
         </div>
         <div className="topbar__actions">
           <div className="chip">当前采访模型：Claude Sonnet 4.6</div>
+          <div className="chip">浏览器本地存储模式</div>
           <Link className="button button--ghost" href="/">
             返回老师聊天页
           </Link>
@@ -45,14 +78,14 @@ export default async function AdminPage() {
       <section className="pageHeader">
         <h1>后台不是看一堆碎聊天，而是直接看排课规则全貌。</h1>
         <p>
-          这里会按会话汇总排课目标、硬性约束、软性偏好、特殊场景和人工调整流程。你可以先看列表，再进入任意一场访谈详情。
+          当前部署还没有接入服务端持久化，所以这里展示的是你当前浏览器里保存的访谈记录；同一浏览器下，仍然可以完整查看会话和结构化摘要。
         </p>
       </section>
 
       <section className="statsGrid">
         <article className="panel statCard">
           <strong>{sessions.length}</strong>
-          <span>累计访谈会话</span>
+          <span>当前浏览器中的访谈会话</span>
         </article>
         <article className="panel statCard">
           <strong>{completedCount}</strong>
@@ -75,18 +108,21 @@ export default async function AdminPage() {
                     <div>
                       <div className="sessionLink__title">{session.title}</div>
                       <div className="sessionLink__meta">
-                        最后更新时间：{formatDateTime(session.updatedAt)} · 共 {session.messageCount} 条消息
+                        最后更新时间：{formatDateTime(session.updatedAt)} · 共 {session.messages.length}{" "}
+                        条消息
                       </div>
                     </div>
                     <span
-                      className={`pill ${session.status === "review-ready" ? "pill--success" : ""}`}
+                      className={`pill ${session.insights.status === "review-ready" ? "pill--success" : ""}`}
                     >
-                      {session.status === "review-ready" ? "可复核" : `${session.completionRate}%`}
+                      {session.insights.status === "review-ready"
+                        ? "可复核"
+                        : `${session.insights.completionRate}%`}
                     </span>
                   </div>
                   <div className="sessionLink__meta">
-                    {session.highlightedRules.length
-                      ? session.highlightedRules.slice(0, 2).join(" ｜ ")
+                    {session.insights.highlightedRules.length
+                      ? session.insights.highlightedRules.slice(0, 2).join(" ｜ ")
                       : "还没有提炼出关键规则摘要"}
                   </div>
                 </Link>
@@ -94,7 +130,7 @@ export default async function AdminPage() {
             </div>
           ) : (
             <div className="emptyState">
-              还没有访谈数据。先去老师聊天页发起一场排课访谈。
+              当前浏览器还没有访谈数据。先去老师聊天页发起一场排课访谈。
             </div>
           )}
         </section>
@@ -104,7 +140,7 @@ export default async function AdminPage() {
           <ul className="bulletList">
             <li>优先打开覆盖率高的会话，通常已经把学校排课逻辑讲得更完整。</li>
             <li>先看“关键规则”，再看“缺失主题”，能快速判断还要不要继续追问。</li>
-            <li>如果某场访谈一直缺“例外场景”或“人工流程”，说明系统还无法真正落地。</li>
+            <li>如果要跨设备共享后台结果，下一步需要接入 Vercel KV 或数据库。</li>
           </ul>
         </aside>
       </section>

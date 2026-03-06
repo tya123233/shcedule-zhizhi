@@ -1,0 +1,45 @@
+{
+  "verification_level": "L1",
+  "base_url": "http://localhost:3006",
+  "runtime_mode": "VERCEL=1 browser-storage fallback",
+  "session_id": "c1185ef1-4d2b-4739-8ca4-88bd4565ef39",
+  "requests": [
+    {
+      "method": "POST",
+      "url": "/api/sessions",
+      "status": 201,
+      "duration_ms": 10
+    },
+    {
+      "method": "POST",
+      "url": "/api/sessions/c1185ef1-4d2b-4739-8ca4-88bd4565ef39/messages",
+      "status": 200,
+      "duration_ms": 11800
+    },
+    {
+      "method": "GET",
+      "url": "/admin",
+      "status": 200,
+      "duration_ms": 21
+    },
+    {
+      "method": "GET",
+      "url": "/admin/c1185ef1-4d2b-4739-8ca4-88bd4565ef39",
+      "status": 200,
+      "duration_ms": 25
+    }
+  ],
+  "api_probe": {
+    "create_session": {
+      "status": 201,
+      "duration_ms": 41,
+      "storage_mode": "browser"
+    },
+    "append_message": {
+      "status": 200,
+      "duration_ms": 11123,
+      "storage_mode": "browser",
+      "interviewer_model": "anthropic/claude-4.6-sonnet-20260217"
+    }
+  }
+}

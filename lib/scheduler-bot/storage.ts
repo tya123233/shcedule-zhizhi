@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { kv } from "@vercel/kv";
 
 import {
   buildAssistantReply,
@@ -9,9 +10,11 @@ import {
   makeSessionTitle,
 } from "@/lib/scheduler-bot/interview-engine";
 import { generateInterviewTurn } from "@/lib/scheduler-bot/openrouter";
+import { getStorageMode } from "@/lib/scheduler-bot/storage-mode";
 import type { InterviewSession, SessionSummary } from "@/lib/scheduler-bot/types";
 
 const DATA_DIR = path.join(process.cwd(), "data", "sessions");
+const KV_SESSION_KEY_PREFIX = "schedule-interview:session:";
 
 async function ensureDataDir() {
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -21,16 +24,38 @@ function getSessionFilePath(sessionId: string) {
   return path.join(DATA_DIR, `${sessionId}.json`);
 }
 
+function getSessionKvKey(sessionId: string) {
+  return `${KV_SESSION_KEY_PREFIX}${sessionId}`;
+}
+
 export async function writeSession(session: InterviewSession) {
+  const storageMode = getStorageMode();
+
+  if (storageMode === "browser") {
+    return;
+  }
+
+  if (storageMode === "kv") {
+    await kv.set(getSessionKvKey(session.id), session);
+    return;
+  }
+
   await ensureDataDir();
-  await fs.writeFile(
-    getSessionFilePath(session.id),
-    JSON.stringify(session, null, 2),
-    "utf8",
-  );
+  await fs.writeFile(getSessionFilePath(session.id), JSON.stringify(session, null, 2), "utf8");
 }
 
 export async function readSession(sessionId: string) {
+  const storageMode = getStorageMode();
+
+  if (storageMode === "browser") {
+    return null;
+  }
+
+  if (storageMode === "kv") {
+    const session = await kv.get<InterviewSession>(getSessionKvKey(sessionId));
+    return session ?? null;
+  }
+
   await ensureDataDir();
 
   try {
@@ -58,18 +83,43 @@ export function toSessionSummary(session: InterviewSession): SessionSummary {
   };
 }
 
-export async function listSessions() {
-  await ensureDataDir();
+async function listKvSessions() {
+  const sessions: InterviewSession[] = [];
 
-  const files = await fs.readdir(DATA_DIR);
-  const sessions = await Promise.all(
-    files
-      .filter((file) => file.endsWith(".json"))
-      .map(async (file) => {
-        const content = await fs.readFile(path.join(DATA_DIR, file), "utf8");
-        return JSON.parse(content) as InterviewSession;
-      }),
-  );
+  for await (const key of kv.scanIterator({ match: `${KV_SESSION_KEY_PREFIX}*`, count: 100 })) {
+    const session = await kv.get<InterviewSession>(String(key));
+
+    if (session) {
+      sessions.push(session);
+    }
+  }
+
+  return sessions;
+}
+
+export async function listSessions() {
+  const storageMode = getStorageMode();
+
+  if (storageMode === "browser") {
+    return [];
+  }
+
+  const sessions =
+    storageMode === "kv"
+      ? await listKvSessions()
+      : await (async () => {
+          await ensureDataDir();
+
+          const files = await fs.readdir(DATA_DIR);
+          return Promise.all(
+            files
+              .filter((file) => file.endsWith(".json"))
+              .map(async (file) => {
+                const content = await fs.readFile(path.join(DATA_DIR, file), "utf8");
+                return JSON.parse(content) as InterviewSession;
+              }),
+          );
+        })();
 
   return sessions.sort(
     (left, right) =>
@@ -98,13 +148,7 @@ function mergeTakeaways(existing: string[], incoming: string[]) {
   ).slice(0, 6);
 }
 
-export async function appendTeacherMessage(sessionId: string, content: string) {
-  const session = await readSession(sessionId);
-
-  if (!session) {
-    return null;
-  }
-
+async function buildSessionAfterTeacherMessage(session: InterviewSession, content: string) {
   const teacherMessage = createMessage("teacher", content);
   const draftMessages = [...session.messages, teacherMessage];
   const draftSession: InterviewSession = {
@@ -163,6 +207,29 @@ export async function appendTeacherMessage(sessionId: string, content: string) {
     }),
   };
 
-  await writeSession(finalSession);
+  return finalSession;
+}
+
+export async function appendTeacherMessage(
+  sessionId: string,
+  content: string,
+  providedSession?: InterviewSession | null,
+) {
+  const storageMode = getStorageMode();
+  const session =
+    providedSession && providedSession.id === sessionId
+      ? providedSession
+      : await readSession(sessionId);
+
+  if (!session) {
+    return null;
+  }
+
+  const finalSession = await buildSessionAfterTeacherMessage(session, content);
+
+  if (storageMode !== "browser") {
+    await writeSession(finalSession);
+  }
+
   return finalSession;
 }

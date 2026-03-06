@@ -1,31 +1,56 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useMemo, useSyncExternalStore } from "react";
 
-import { SessionDetailClient } from "@/components/session-detail-client";
+import {
+  getLocalSessionRaw,
+  subscribeToSessionStore,
+} from "@/lib/scheduler-bot/browser-storage";
 import { formatDurationMs, formatFullDateTime } from "@/lib/scheduler-bot/format";
-import { getStorageMode } from "@/lib/scheduler-bot/storage-mode";
-import { readSession } from "@/lib/scheduler-bot/storage";
+import type { InterviewSession } from "@/lib/scheduler-bot/types";
 
-export const dynamic = "force-dynamic";
-
-interface PageProps {
-  params: Promise<{
-    sessionId: string;
-  }>;
+interface SessionDetailClientProps {
+  sessionId: string;
 }
 
-export default async function SessionDetailPage({ params }: PageProps) {
-  const { sessionId } = await params;
-  const storageMode = getStorageMode();
+export function SessionDetailClient({ sessionId }: SessionDetailClientProps) {
+  const rawSession = useSyncExternalStore(
+    subscribeToSessionStore,
+    () => getLocalSessionRaw(sessionId),
+    () => "",
+  );
+  const session = useMemo<InterviewSession | null>(() => {
+    if (!rawSession) {
+      return null;
+    }
 
-  if (storageMode === "browser") {
-    return <SessionDetailClient sessionId={sessionId} />;
-  }
-
-  const session = await readSession(sessionId);
+    try {
+      return JSON.parse(rawSession) as InterviewSession;
+    } catch {
+      return null;
+    }
+  }, [rawSession]);
 
   if (!session) {
-    notFound();
+    return (
+      <main className="shell">
+        <div className="topbar">
+          <div className="brand">
+            <div className="brand__badge">详</div>
+            <div>
+              <div className="brand__title">未找到访谈详情</div>
+              <div className="brand__meta">当前浏览器里没有这场访谈记录。</div>
+            </div>
+          </div>
+          <div className="topbar__actions">
+            <Link className="button button--ghost" href="/admin">
+              返回会话列表
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -42,6 +67,7 @@ export default async function SessionDetailPage({ params }: PageProps) {
           </div>
         </div>
         <div className="topbar__actions">
+          <div className="chip">浏览器本地存储模式</div>
           <Link className="button button--ghost" href="/admin">
             返回会话列表
           </Link>
@@ -68,6 +94,7 @@ export default async function SessionDetailPage({ params }: PageProps) {
                 ? ` ${session.insights.interviewer.model ?? "anthropic/claude-sonnet-4.6"} · ${formatDurationMs(session.insights.interviewer.lastDurationMs)}`
                 : ` 规则兜底 · ${session.insights.interviewer.warning ?? "模型暂不可用"}`}
             </div>
+            <div className="detailCard__meta">会话存储：当前浏览器本地保存</div>
             <ul className="bulletList">
               {session.insights.highlightedRules.length ? (
                 session.insights.highlightedRules.map((item) => <li key={item}>{item}</li>)

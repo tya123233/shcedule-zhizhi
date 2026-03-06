@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  getCurrentLocalSession,
+  saveSessionLocally,
+} from "@/lib/scheduler-bot/browser-storage";
 import { formatDateTime, formatDurationMs } from "@/lib/scheduler-bot/format";
+import type { StorageMode } from "@/lib/scheduler-bot/storage-mode";
 import type { InterviewSession } from "@/lib/scheduler-bot/types";
-
-const CURRENT_SESSION_KEY = "schedule-interview-current-session";
 
 async function createSession() {
   const response = await fetch("/api/sessions", {
@@ -32,13 +35,25 @@ async function getSession(sessionId: string) {
   return data.session;
 }
 
-async function sendTeacherMessage(sessionId: string, content: string) {
+async function sendTeacherMessage(
+  sessionId: string,
+  content: string,
+  storageMode: StorageMode,
+  session: InterviewSession,
+) {
   const response = await fetch(`/api/sessions/${sessionId}/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(
+      storageMode === "browser"
+        ? {
+            content,
+            session,
+          }
+        : { content },
+    ),
   });
 
   if (!response.ok) {
@@ -49,7 +64,11 @@ async function sendTeacherMessage(sessionId: string, content: string) {
   return data.session;
 }
 
-export function ChatWorkspace() {
+interface ChatWorkspaceProps {
+  storageMode: StorageMode;
+}
+
+export function ChatWorkspace({ storageMode }: ChatWorkspaceProps) {
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -57,28 +76,31 @@ export function ChatWorkspace() {
   const [booting, setBooting] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const isBrowserStorage = storageMode === "browser";
 
   useEffect(() => {
     void (async () => {
       try {
-        const savedSessionId =
-          typeof window !== "undefined"
-            ? window.localStorage.getItem(CURRENT_SESSION_KEY)
-            : null;
+        const savedSession = getCurrentLocalSession();
 
-        let nextSession: InterviewSession;
+        if (savedSession) {
+          setSession(savedSession);
 
-        if (savedSessionId) {
-          try {
-            nextSession = await getSession(savedSessionId);
-          } catch {
-            nextSession = await createSession();
+          if (!isBrowserStorage) {
+            try {
+              const refreshedSession = await getSession(savedSession.id);
+              saveSessionLocally(refreshedSession);
+              setSession(refreshedSession);
+            } catch {
+              // Keep the last local snapshot if the refresh fails.
+            }
           }
-        } else {
-          nextSession = await createSession();
+
+          return;
         }
 
-        window.localStorage.setItem(CURRENT_SESSION_KEY, nextSession.id);
+        const nextSession = await createSession();
+        saveSessionLocally(nextSession);
         setSession(nextSession);
       } catch (requestError) {
         setError(
@@ -88,7 +110,7 @@ export function ChatWorkspace() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [isBrowserStorage]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -104,7 +126,7 @@ export function ChatWorkspace() {
       setBooting(true);
       setError("");
       const nextSession = await createSession();
-      window.localStorage.setItem(CURRENT_SESSION_KEY, nextSession.id);
+      saveSessionLocally(nextSession);
       setInput("");
       setSession(nextSession);
     } catch (requestError) {
@@ -132,7 +154,8 @@ export function ChatWorkspace() {
     setInput("");
 
     try {
-      const nextSession = await sendTeacherMessage(session.id, content);
+      const nextSession = await sendTeacherMessage(session.id, content, storageMode, session);
+      saveSessionLocally(nextSession);
       setSession(nextSession);
     } catch (requestError) {
       setInput(content);
@@ -165,7 +188,9 @@ export function ChatWorkspace() {
           </div>
         </div>
         <div className="topbar__actions">
-          <div className="chip">本地落库到 JSON，无需数据库</div>
+          <div className="chip">
+            {isBrowserStorage ? "浏览器本地存储模式" : "服务端持久化模式"}
+          </div>
           <div className="chip">
             {session?.insights.interviewer.source === "openrouter"
               ? `OpenRouter · ${session.insights.interviewer.model ?? "Claude Sonnet 4.6"}`
@@ -184,6 +209,11 @@ export function ChatWorkspace() {
           <p>
             这个机器人不会只问一句“你有什么需求”就结束，而是会围绕总目标、硬性约束、软性偏好、共享资源、例外场景、人工调整流程持续追问，让后端能直接看懂学校是怎么排课的。
           </p>
+          {isBrowserStorage ? (
+            <div className="heroCard__notice">
+              当前部署未配置服务端持久化存储，所以访谈结果会保存在你现在这个浏览器里；同一浏览器下，后台页仍可直接查看完整结果。
+            </div>
+          ) : null}
           <div className="heroCard__grid">
             <div className="heroMetric">
               <strong>9 类</strong>
@@ -343,6 +373,10 @@ export function ChatWorkspace() {
                     ? `${session.insights.interviewer.model ?? "anthropic/claude-sonnet-4.6"} · ${formatDurationMs(session.insights.interviewer.lastDurationMs)}`
                     : `规则兜底 · ${session?.insights.interviewer.warning ?? "模型暂不可用"}`}
                 </span>
+              </div>
+              <div className="statusItem">
+                <strong>会话存储位置</strong>
+                <span>{isBrowserStorage ? "当前浏览器本地保存" : "服务端持久化保存"}</span>
               </div>
             </div>
           </section>

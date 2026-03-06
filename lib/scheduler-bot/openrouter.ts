@@ -140,7 +140,33 @@ export async function generateInterviewTurn(
       body: JSON.stringify({
         model: config.model,
         response_format: {
-          type: "json_object",
+          type: "json_schema",
+          json_schema: {
+            name: "schedule_interview_turn",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                reply: {
+                  type: "string",
+                  description: "给老师的下一条采访回复，先确认后追问。",
+                },
+                takeaways: {
+                  type: "array",
+                  description: "老师刚刚明确说出的规则提炼，不要脑补。",
+                  items: {
+                    type: "string",
+                  },
+                },
+                titleSuggestion: {
+                  anyOf: [{ type: "string" }, { type: "null" }],
+                  description: "可选，会话标题；没有更好建议时返回 null。",
+                },
+              },
+              required: ["reply", "takeaways", "titleSuggestion"],
+              additionalProperties: false,
+            },
+          },
         },
         messages: [
           {

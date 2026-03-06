@@ -1,0 +1,27 @@
+## UX 验证报告
+
+- 验证级别: L1
+- 最终结论: PASS
+- 验证环境: 本地 `VERCEL=1` 模式，模拟线上未配置服务端持久化存储时的真实行为
+- 关键接口耗时:
+  - POST /api/sessions: 0.010s
+  - POST /api/sessions/c1185ef1-4d2b-4739-8ca4-88bd4565ef39/messages: 11.8s
+  - GET /admin: 0.021s
+  - GET /admin/c1185ef1-4d2b-4739-8ca4-88bd4565ef39: 0.025s
+- 错误统计:
+  - 静态资源 404: 0
+  - console error: 0
+  - pageerror: 0
+- 数据流交叉验证:
+  - API 字段 `storageMode = browser` -> 首页与后台顶部芯片 `浏览器本地存储模式`: PASS
+  - API 字段 `openingMessage = 我是排课访谈机器人...先从最关键的开始` -> 首页首条机器人气泡可见同样开场文案: PASS
+  - API 字段 `interviewerModel = anthropic/claude-4.6-sonnet-20260217` -> 首页芯片 `OpenRouter · anthropic/claude-4.6-sonnet-20260217` 与详情页 `采访引擎` 一致: PASS
+  - API 字段 `title = 高中排课规则采访——36班走班与跨校区约束` -> 首页会话标题、后台列表、后台详情标题一致: PASS
+  - API 字段 `highlightedRules[0] = 高三和实验班排课优先级最高` -> 首页 `后台会看到的关键规则` 与后台详情规则摘要可见: PASS
+- 截图:
+  - verify-1-loaded.png
+  - verify-2-after-action.png
+  - verify-3-result.png
+  - verify-4-admin-detail.png
+- 产物目录:
+  - document/ux-verification/20260306_103737/
