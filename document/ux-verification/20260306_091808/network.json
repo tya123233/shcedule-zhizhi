@@ -1,0 +1,31 @@
+{
+  "verification_level": "L1",
+  "base_url": "http://localhost:3005",
+  "session_id": "5e2a8ad1-3eba-4c89-a768-bdad02b8c8b2",
+  "requests": [
+    {
+      "method": "POST",
+      "url": "/api/sessions",
+      "status": 201,
+      "duration_ms": 319
+    },
+    {
+      "method": "POST",
+      "url": "/api/sessions/5e2a8ad1-3eba-4c89-a768-bdad02b8c8b2/messages",
+      "status": 200,
+      "duration_ms": 10900
+    },
+    {
+      "method": "GET",
+      "url": "/admin",
+      "status": 200,
+      "duration_ms": 104
+    },
+    {
+      "method": "GET",
+      "url": "/admin/5e2a8ad1-3eba-4c89-a768-bdad02b8c8b2",
+      "status": 200,
+      "duration_ms": 272
+    }
+  ]
+}

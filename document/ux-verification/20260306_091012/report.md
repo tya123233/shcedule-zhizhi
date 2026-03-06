@@ -1,0 +1,24 @@
+## UX 验证报告
+
+- 验证级别: L1
+- 最终结论: PASS
+- 关键接口耗时:
+  - POST /api/sessions: 0.016s
+  - POST /api/sessions/<sessionId>/messages: 0.029s
+  - GET /admin?_rsc=vusbg: 0.027s
+  - GET /admin/<sessionId>?_rsc=1szk4: 0.021s
+- 错误统计:
+  - 静态资源 404: 0
+  - console error: 0
+  - pageerror: 0
+- 数据流交叉验证:
+  - API 字段 `insights.completionRate = 67` -> 首页与后台 DOM 文本 `67%`: PASS
+  - API 字段 `insights.nextQuestion = 有哪些特殊场景要单独处理...` -> 首页“下一问”文案一致: PASS
+  - API 字段 `title = 我们学校先保证高三和实验班的主科在上午...` -> 后台列表与详情标题可见: PASS
+- 截图:
+  - verify-1-loaded.png
+  - verify-2-after-action.png
+  - verify-3-result.png
+  - verify-4-admin-detail.png
+- 产物目录:
+  - document/ux-verification/20260306_091012/

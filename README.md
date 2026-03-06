@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 排课访谈机器人
 
-## Getting Started
+这是一个独立的新项目，用来做两件事：
 
-First, run the development server:
+1. 让老师像聊天一样，把学校真实的排课规则、限制条件、例外场景和人工调整逻辑逐步交代清楚。
+2. 让管理者在后台一键查看每次访谈的完整会话和结构化摘要。
+
+## 本地运行
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 模型配置
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+复制 `.env.example` 为 `.env.local`，并配置：
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL_INTERVIEW=anthropic/claude-sonnet-4.6
+OPENROUTER_HTTP_REFERER=http://localhost:3000
+```
 
-## Learn More
+打开 `http://localhost:3000` 进入老师聊天页。  
+打开 `http://localhost:3000/admin` 进入后台查看页。
 
-To learn more about Next.js, take a look at the following resources:
+## 结构说明
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `app/`：页面与 API Route
+- `components/`：聊天工作区组件
+- `lib/scheduler-bot/`：访谈主题、规则提炼、本地存储
+- `data/sessions/`：会话 JSON 文件
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 当前实现
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 老师端聊天访谈界面
+- 本地文件持久化会话
+- 结构化主题覆盖率统计
+- 后台会话列表与详情页
+- 无数据库即可跑通

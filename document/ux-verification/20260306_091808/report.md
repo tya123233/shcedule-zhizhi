@@ -1,0 +1,25 @@
+## UX 验证报告
+
+- 验证级别: L1
+- 最终结论: PASS
+- 关键接口耗时:
+  - POST /api/sessions: 0.319s
+  - POST /api/sessions/5e2a8ad1-3eba-4c89-a768-bdad02b8c8b2/messages: 10.9s
+  - GET /admin: 0.104s
+  - GET /admin/5e2a8ad1-3eba-4c89-a768-bdad02b8c8b2: 0.272s
+- 错误统计:
+  - 静态资源 404: 0
+  - console error: 0
+  - pageerror: 0
+- 数据流交叉验证:
+  - API 字段 `insights.interviewer.model = anthropic/claude-4.6-sonnet-20260217` -> 首页状态条 `OpenRouter · anthropic/claude-4.6-sonnet-20260217` 与后台详情 `采访引擎` 一致: PASS
+  - API 字段 `title = 高中36班排课规则采访-含走班与跨校区约束` -> 后台列表与详情标题可见: PASS
+  - API 字段 `highlightedRules[0] = 跨校区老师同一天连续两节之间至少空一节（硬约束）` -> 首页 `后台会看到的关键规则` 与后台列表摘要可见: PASS
+  - API 字段 `interviewer.lastDurationMs = 10358` -> 首页 `本轮采访引擎` 显示 `10.4s`: PASS
+- 截图:
+  - verify-1-loaded.png
+  - verify-2-after-action.png
+  - verify-3-result.png
+  - verify-4-admin-detail.png
+- 产物目录:
+  - document/ux-verification/20260306_091808/
